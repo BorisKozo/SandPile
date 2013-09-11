@@ -1,7 +1,7 @@
 ﻿window.onload = function () {
 
   var surface = document.getElementById('screen').getContext('2d');
-  var sand = [];
+  var particles = [];
 
   var gravity = { x: 0, y: 0.1 };
   var bounciness = 0.3;
@@ -26,8 +26,21 @@
     return (Math.random() * range) + min;
   }
 
-  function generateSandParticle() {
-    sand.push({ x: 200, y: 10 });
+  function generateParticle() {
+    particles.push({ x: 200, y: 10 });
+  }
+
+
+  /// Returns true if there is another particle below the given particle
+  function hasParticleBelow(particle, particles) {
+    var i;
+    for (var i = particles.length - 1; i >= 0; i--) {
+      if (particles[i].x === particle.x && particles[i].y === (particle.y + 1)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   var currentScreen = {
@@ -37,34 +50,30 @@
 
       ctx.strokeStyle = 'blue';
       ctx.beginPath();
-      ctx.moveTo(0, floor.y+1);
-      ctx.lineTo(ctx.canvas.width, floor.y+1);
+      ctx.moveTo(0, floor.y+2);
+      ctx.lineTo(ctx.canvas.width, floor.y+2);
       ctx.stroke();
 
-      for (var i = sand.length - 1; i >= 0; i--) {
-        putGreenPixel(sand[i].x, sand[i].y);
+      for (var i = particles.length - 1; i >= 0; i--) {
+        putGreenPixel(particles[i].x, particles[i].y);
       }
 
     },
     update: function () {
-      if (random(0, 50) < 1) {
-        generateSandParticle();
+      if (random(0, 10) < 1) {
+        generateParticle();
       }
 
-      var p;
-      for (var i = sand.length - 1; i >= 0; i--) {
-        p = sand[i];
-
-        p.x += 0;
-        p.y += 1;
-
-
-        // hit the floor (or interact with other particles)
-        // this logic is very dependent on the nature of the interaction
-        if (p.y == floor.y) {
-          p.y = floor.y-1;
+      var particle;
+      for (var i = particles.length - 1; i >= 0; i--) {
+        particle = particles[i];
+        if (particle.y == floor.y) {
+          continue;
         }
-
+        if (hasParticleBelow(particle, particles)) {
+          continue;
+        }
+        particle.y += 1;
       }
     }
   };
