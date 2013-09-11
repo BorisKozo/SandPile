@@ -1,6 +1,9 @@
 ﻿window.onload = function () {
 
   var surface = document.getElementById('screen').getContext('2d');
+  var fpsLabel = document.getElementById('fps-label');
+  var particleCounterLabel = document.getElementById('particle-counter-label');
+  var fps = 0;
   var particles = [];
 
   var gravity = { x: 0, y: 0.1 };
@@ -19,7 +22,7 @@
     }
   }
 
-  var putGreenPixel = getPutPixelFunction(surface, 0, 1, 0, 1);
+  var putGreenPixel = getPutPixelFunction(surface, 0, 255, 0, 255);
 
   function random(min, max) {
     var range = max - min;
@@ -31,16 +34,29 @@
   }
 
 
-  /// Returns true if there is another particle below the given particle
-  function hasParticleBelow(particle, particles) {
+  /// returns 1 or -1 at random
+  function randomDirection() {
+    if (random(0, 1) > 0.5) {
+      return 1;
+    }
+    return -1;
+  }
+
+  /// returns true if the position (x,y) is free of particles
+  function isFree(x, y, particles) {
     var i;
     for (var i = particles.length - 1; i >= 0; i--) {
-      if (particles[i].x === particle.x && particles[i].y === (particle.y + 1)) {
-        return true;
+      if (particles[i].x === x && particles[i].y === y) {
+        return false;
       }
     }
 
-    return false;
+    return true;
+  }
+
+  /// Returns true if there is another particle below the given particle
+  function hasParticleBelow(particle, particles) {
+    return !isFree(particle.x, particle.y + 1, particles);
   }
 
   var currentScreen = {
@@ -50,27 +66,47 @@
 
       ctx.strokeStyle = 'blue';
       ctx.beginPath();
-      ctx.moveTo(0, floor.y+2);
-      ctx.lineTo(ctx.canvas.width, floor.y+2);
+      ctx.moveTo(0, floor.y + 2);
+      ctx.lineTo(ctx.canvas.width, floor.y + 2);
       ctx.stroke();
 
       for (var i = particles.length - 1; i >= 0; i--) {
         putGreenPixel(particles[i].x, particles[i].y);
       }
 
-    },
-    update: function () {
-      if (random(0, 10) < 1) {
-        generateParticle();
-      }
+      fpsLabel.innerText = fps;
+      particleCounterLabel.innerText = particles.length;
 
-      var particle;
+
+    },
+    update: function (delta) {
+      fps = Math.round((1 / delta)*1000);
+      generateParticle();
+
+      var particle, left, right;
       for (var i = particles.length - 1; i >= 0; i--) {
         particle = particles[i];
         if (particle.y == floor.y) {
           continue;
         }
         if (hasParticleBelow(particle, particles)) {
+          left = isFree(particle.x - 1, particle.y + 1, particles);
+          right = isFree(particle.x + 1, particle.y + 1, particles);
+          if (left && right) {
+            particle.y += 1;
+            particle.x += randomDirection();
+            continue;
+          }
+          if (left) {
+            particle.y += 1;
+            particle.x -= 1;
+            continue;
+          }
+          if (right) {
+            particle.y += 1;
+            particle.x += 1;
+            continue;
+          }
           continue;
         }
         particle.y += 1;
