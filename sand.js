@@ -1,13 +1,61 @@
 ﻿window.onload = function () {
+  //Particles class
+  var Particles = function () {
+    this.data = {};
+    this.tempParticles = [];
+    this._isDirty = false;
+  }
+
+  Particles.encodeId = function (x, y) {
+    return x.toString() + "|" + y.toString();
+  }
+
+  Particles.prototype.setParticle = function (particle) {
+    this.data[Particles.encodeId(particle.x, particle.y)] = particle;
+    this._isDirty = true;
+  }
+
+  Particles.prototype.getParticle = function (x, y) {
+    var id = Particles.encodeId(x, y);
+    var result = this.data[id];
+    if (result) {
+      return result;
+    }
+
+    return null;
+  }
+
+  Particles.prototype.deleteParticle = function (x, y) {
+    var id = Particles.encodeId(x, y);
+    this.data[id] = null;
+    this._isDirty = true;
+  }
+
+  Particles.prototype.getAllParticles = function () {
+    var particleId;
+    var count = 0;
+
+    if (!this._isDirty) {
+      return this.tempParticles;
+    }
+
+    for (particleId in this.data) {
+      if (this.data.hasOwnProperty(particleId) && this.data[particleId] !== null) {
+        this.tempParticles[count] = this.data[particleId];
+        count++;
+      }
+    }
+    this.tempParticles.length = count;
+    return this.tempParticles;
+  }
+
 
   var surface = document.getElementById('screen').getContext('2d');
   var fpsLabel = document.getElementById('fps-label');
   var particleCounterLabel = document.getElementById('particle-counter-label');
   var fps = 0;
-  var particles = [];
+  var particles = new Particles();
 
-  var gravity = { x: 0, y: 0.1 };
-  var bounciness = 0.3;
   var floor = { y: 300 };
 
   function getPutPixelFunction(context, r, g, b, a) {
@@ -30,7 +78,7 @@
   }
 
   function generateParticle() {
-    particles.push({ x: 200, y: 10 });
+    particles.setParticle({ x: 200, y: 10 });
   }
 
 
@@ -44,14 +92,7 @@
 
   /// returns true if the position (x,y) is free of particles
   function isFree(x, y, particles) {
-    var i;
-    for (var i = particles.length - 1; i >= 0; i--) {
-      if (particles[i].x === x && particles[i].y === y) {
-        return false;
-      }
-    }
-
-    return true;
+    return particles.getParticle(x,y) === null;
   }
 
   /// Returns true if there is another particle below the given particle
@@ -69,13 +110,13 @@
       ctx.moveTo(0, floor.y + 2);
       ctx.lineTo(ctx.canvas.width, floor.y + 2);
       ctx.stroke();
-
-      for (var i = particles.length - 1; i >= 0; i--) {
-        putGreenPixel(particles[i].x, particles[i].y);
+      var particlesData = particles.getAllParticles();
+      for (var i = particlesData.length - 1; i >= 0; i--) {
+        putGreenPixel(particlesData[i].x, particlesData[i].y);
       }
 
       fpsLabel.innerText = fps;
-      particleCounterLabel.innerText = particles.length;
+      particleCounterLabel.innerText = particlesData.length;
 
 
     },
@@ -84,32 +125,37 @@
       generateParticle();
 
       var particle, left, right;
-      for (var i = particles.length - 1; i >= 0; i--) {
-        particle = particles[i];
+      var particlesData = particles.getAllParticles();
+      for (var i = particlesData.length - 1; i >= 0; i--) {
+        particle = particlesData[i];
         if (particle.y == floor.y) {
           continue;
         }
+        particles.deleteParticle(particle.x, particle.y);
         if (hasParticleBelow(particle, particles)) {
           left = isFree(particle.x - 1, particle.y + 1, particles);
           right = isFree(particle.x + 1, particle.y + 1, particles);
+
           if (left && right) {
             particle.y += 1;
             particle.x += randomDirection();
-            continue;
+          } else {
+            if (left) {
+              particle.y += 1;
+              particle.x -= 1;
+            }
+            else {
+              if (right) {
+                particle.y += 1;
+                particle.x += 1;
+              }
+            }
           }
-          if (left) {
-            particle.y += 1;
-            particle.x -= 1;
-            continue;
-          }
-          if (right) {
-            particle.y += 1;
-            particle.x += 1;
-            continue;
-          }
-          continue;
+        } else {
+          particle.y += 1;
         }
-        particle.y += 1;
+
+        particles.setParticle(particle);
       }
     }
   };
