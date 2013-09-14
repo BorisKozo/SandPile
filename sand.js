@@ -58,19 +58,22 @@
 
   var floor = { y: 300 };
 
-  function getPutPixelFunction(context, r, g, b, a) {
-    var id = context.createImageData(1, 1);   // only do this once per page
-    var d = id.data;                        // only do this once per page
-    d[0] = r;
-    d[1] = g;
-    d[2] = b;
-    d[3] = a;
-    return function (x, y) {
-      context.putImageData(id, x, y);
-    }
-  }
+  //function getPutPixelFunction(context, r, g, b, a) {
+  //  var id = context.createImageData(1, 1);   // only do this once per page
+  //  var d = id.data;                        // only do this once per page
+  //  d[0] = r;
+  //  d[1] = g;
+  //  d[2] = b;
+  //  d[3] = a;
+  //  return function (x, y) {
+  //    context.putImageData(id, x, y);
+  //  }
+  //}
 
-  var putGreenPixel = getPutPixelFunction(surface, 0, 255, 0, 255);
+  var putGreenPixel = function (context, x, y) {
+    context.fillStyle = "#0F0";
+    context.fillRect(x, y, 1, 1);
+  }//getPutPixelFunction(surface, 0, 255, 0, 255);
 
   function random(min, max) {
     var range = max - min;
@@ -110,14 +113,19 @@
       ctx.moveTo(0, floor.y + 2);
       ctx.lineTo(ctx.canvas.width, floor.y + 2);
       ctx.stroke();
+
+      ctx.beginPath();
       var particlesData = particles.getAllParticles();
       for (var i = particlesData.length - 1; i >= 0; i--) {
-        putGreenPixel(particlesData[i].x, particlesData[i].y);
+        putGreenPixel(ctx, particlesData[i].x, particlesData[i].y);
       }
+      ctx.fill();
 
       fpsLabel.innerText = fps;
       particleCounterLabel.innerText = particlesData.length;
-
+      if (fps < 55) {
+        console.log(particlesData.length);
+      }
 
     },
     update: function (delta) {
