@@ -1,47 +1,69 @@
 ﻿window.onload = function () {
   //Particles class
   var Particles = function () {
-    this.data = {};
+    this.allParticles = {};
     this.tempParticles = [];
-    this._isDirty = false;
+    this.isDirty = false;
+
+    this.activeParticles = {};
+    this.tempActiveParticles = [];
   }
 
   Particles.encodeId = function (x, y) {
     return x.toString() + "|" + y.toString();
   }
 
-  Particles.prototype.setParticle = function (particle) {
-    this.data[Particles.encodeId(particle.x, particle.y)] = particle;
-    this._isDirty = true;
-  }
-
   Particles.prototype.getParticle = function (x, y) {
     var id = Particles.encodeId(x, y);
-    var result = this.data[id];
+    var result = this.allParticles[id];
     if (result) {
       return result;
     }
-
     return null;
+  }
+
+  Particles.prototype.setParticle = function (particle) {
+    var id = Particles.encodeId(particle.x, particle.y);
+    this.allParticles[id] = particle;
+    this.activeParticles[id] = particle;
+    this.isDirty = true;
   }
 
   Particles.prototype.deleteParticle = function (x, y) {
     var id = Particles.encodeId(x, y);
-    this.data[id] = null;
-    this._isDirty = true;
+    this.allParticles[id] = null;
+    if (this.activeParticles[id]) {
+      this.activeParticles[id] = null;
+    }
+    this.isDirty = true;
   }
+
+  Particles.prototype.activate = function (particle) {
+    var id = Particles.encodeId(particle.x, particle.y);
+    if (!this.activeParticles[id]) {
+      this.activeParticles[id] = particle;
+    }
+  }
+
+  Particles.prototype.deactivate = function (particle) {
+    var id = Particles.encodeId(particle.x, particle.y);
+    if (this.activeParticles[id]) {
+      this.activeParticles[id] = null;
+    }
+  }
+
 
   Particles.prototype.getAllParticles = function () {
     var particleId;
     var count = 0;
 
-    if (!this._isDirty) {
+    if (!this.isDirty) {
       return this.tempParticles;
     }
 
-    for (particleId in this.data) {
-      if (this.data.hasOwnProperty(particleId) && this.data[particleId] !== null) {
-        this.tempParticles[count] = this.data[particleId];
+    for (particleId in this.allParticles) {
+      if (this.allParticles.hasOwnProperty(particleId) && this.allParticles[particleId] !== null) {
+        this.tempParticles[count] = this.allParticles[particleId];
         count++;
       }
     }
@@ -49,31 +71,37 @@
     return this.tempParticles;
   }
 
+  Particles.prototype.getActiveParticles = function () {
+    var particleId;
+    var count = 0;
+
+
+    for (particleId in this.activeParticles) {
+      if (this.activeParticles.hasOwnProperty(particleId) && this.activeParticles[particleId] !== null) {
+        this.tempActiveParticles[count] = this.activeParticles[particleId];
+        count++;
+      }
+    }
+    this.tempActiveParticles.length = count;
+    return this.tempActiveParticles;
+  }
+
+
 
   var surface = document.getElementById('screen').getContext('2d');
   var fpsLabel = document.getElementById('fps-label');
   var particleCounterLabel = document.getElementById('particle-counter-label');
+  var activeParticleCounterLabel = document.getElementById('active-particle-counter-label'); 
   var fps = 0;
+  var activeParticleCount = 0;
   var particles = new Particles();
 
   var floor = { y: 300 };
 
-  //function getPutPixelFunction(context, r, g, b, a) {
-  //  var id = context.createImageData(1, 1);   // only do this once per page
-  //  var d = id.data;                        // only do this once per page
-  //  d[0] = r;
-  //  d[1] = g;
-  //  d[2] = b;
-  //  d[3] = a;
-  //  return function (x, y) {
-  //    context.putImageData(id, x, y);
-  //  }
-  //}
-
   var putGreenPixel = function (context, x, y) {
     context.fillStyle = "#0F0";
     context.fillRect(x, y, 1, 1);
-  }//getPutPixelFunction(surface, 0, 255, 0, 255);
+  }
 
   function random(min, max) {
     var range = max - min;
@@ -114,15 +142,15 @@
       ctx.lineTo(ctx.canvas.width, floor.y + 2);
       ctx.stroke();
 
-      ctx.beginPath();
+
       var particlesData = particles.getAllParticles();
       for (var i = particlesData.length - 1; i >= 0; i--) {
         putGreenPixel(ctx, particlesData[i].x, particlesData[i].y);
       }
-      ctx.fill();
 
       fpsLabel.innerText = fps;
       particleCounterLabel.innerText = particlesData.length;
+      activeParticleCounterLabel.innerText = activeParticleCount;
       if (fps < 55) {
         console.log(particlesData.length);
       }
@@ -133,10 +161,11 @@
       generateParticle();
 
       var particle, left, right;
-      var particlesData = particles.getAllParticles();
+      var particlesData = particles.getActiveParticles();
       for (var i = particlesData.length - 1; i >= 0; i--) {
         particle = particlesData[i];
         if (particle.y == floor.y) {
+          particles.deactivate(particle);
           continue;
         }
         particles.deleteParticle(particle.x, particle.y);
@@ -156,6 +185,10 @@
               if (right) {
                 particle.y += 1;
                 particle.x += 1;
+              } else {
+                particles.setParticle(particle);
+                particles.deactivate(particle);
+                continue;
               }
             }
           }
@@ -165,6 +198,8 @@
 
         particles.setParticle(particle);
       }
+
+      activeParticleCount = particlesData.length;
     }
   };
 
