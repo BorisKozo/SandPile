@@ -152,6 +152,7 @@ I replaced the _particles_ array with a simple data structure that uses a JavaSc
 This very simple data structure wraps around JavaScript objects and provides a simple CRUD API for particles. 
 Instead of searching for a particle in an array I can now directly retrieve it by calling _getParticle_. 
 The _update_ function is updated to use this new data structure and looks like this:
+
 ```js
       var particlesData = particles.getAllParticles();
       for (var i = particlesData.length - 1; i >= 0; i--) {
@@ -184,6 +185,7 @@ The _update_ function is updated to use this new data structure and looks like t
 
         particles.setParticle(particle);
 ```
+
 A nice side effect of using this method is that I now have two buffers for particles, one for reading and one for writing. 
 This is important because I want the state of the next frame to be changed based on the state of the current frame and not
 depend on the order in which the particles are processed. You can witness this side effect by the lack of jittering in the
@@ -203,13 +205,154 @@ which is somewhat old and not true anymore. Changing the drawing method to a sim
 ```
 
 After these two improvements I could get 60 FPS with about 4.5K particles on the screen.
+You can see this here [http://jsfiddle.net/zbzzn/AFCdy/6/]
 
-** 
- 
+** Partial update and rendering
 
+Looking at the scope of the problem it is possible to divide the particles into two groups for both the _update_
+and the _draw_ functions. Thee first group consists of particles that move around and fall all over the place while the second group 
+of particles just sits there in a pile doing nothing. The important thing is that we don't really care about that second group of particles. 
+What makes things even worse is that the second group of the stationary particles is growing rapidly and consuming the much needed resources within the 16ms time frame. 
 
-Note: I am ignoring the memory consumption of my code for brevity of this text. I should be using object pools and other measures 
-to decrease the memory pressure and GC calls.
+The solution is divided into two parts. In the first part I aim to make the _update_ function run faster. This can be done
+by making the iteration in this function go over the "active" particles (of the first) group and not the "static" particles
+of the second group. The second part is to make the _draw_ function redraw only the changed part of the screen instead of rendering
+all the particles.
 
+The new _Particles_ data structure looks like this:
+(unchanged code was omitted)
 
-  http://jsfiddle.net/zbzzn/AFCdy/6/
+```js
+  var Particles = function () {
+    this.size = 0;
+
+    this.allParticles = {}; // Hash table of all the particles
+
+    this.activeParticles = {}; // Hash table of only the active particles
+    this.tempActiveParticles = []; // Temp array to store the active particles
+
+    this.toDelete = []; // A list of all the particles that were deleted in this frame
+    this.toSet = []; // A list of all the particles that were set in this frame
+  }
+
+  Particles.prototype.setParticle = function (particle) {
+    var id = Particles.encodeId(particle.x, particle.y);
+    this.allParticles[id] = particle; 
+    this.activeParticles[id] = particle; // a set particle is active by default
+    this.toSet.push({ x: particle.x, y: particle.y }); // store which particle was set - There is a memory issue here, see comment at the end
+    this.size += 1;
+  }
+
+  Particles.prototype.deleteParticle = function (x, y) {
+    var id = Particles.encodeId(x, y);
+    var particle = this.allParticles[id];
+    this.allParticles[id] = null;  // delete the particle from both hash tables
+    if (this.activeParticles[id]) {
+      this.activeParticles[id] = null;
+    }
+    this.toDelete.push({ x: particle.x, y: particle.y }); // store which particle was deleted - There is a memory issue here, see comment at the end
+    this.size -= 1;
+  }
+
+  // Delete the particle from the list of active particles
+  Particles.prototype.deactivate = function (particle) {
+    var id = Particles.encodeId(particle.x, particle.y);
+    if (this.activeParticles[id]) {
+      this.activeParticles[id] = null;
+    }
+  }
+
+  // Return a list of all the active particles
+  Particles.prototype.getActiveParticles = function () {
+    var particleId;
+    var count = 0;
+
+    for (particleId in this.activeParticles) {
+      if (this.activeParticles.hasOwnProperty(particleId) && this.activeParticles[particleId] !== null) {
+        this.tempActiveParticles[count] = this.activeParticles[particleId];
+        count++;
+      }
+    }
+    this.tempActiveParticles.length = count;
+    return this.tempActiveParticles;
+  }
+
+  // Reset the state of the particles deleted and set in the current frame
+  Particles.prototype.reset = function () {
+    this.toDelete.length = 0;
+    this.toSet.length = 0;
+  }
+```
+
+Each particle is "active" until proven otherwise. There are two cases when a particle should be removed from the active
+list:
+When a particle hits the floor
+```js
+        if (particle.y == floor.y) {
+          particles.deactivate(particle);
+          continue;
+        }
+```
+When a particle doesn't have anywhere to move in the current frame
+```js
+if (left && right) {
+            particle.y += 1;
+            particle.x += randomDirection();
+          } else {
+            if (left) {
+              particle.y += 1;
+              particle.x -= 1;
+            }
+            else {
+              if (right) {
+                particle.y += 1;
+                particle.x += 1;
+              } else {
+                particles.setParticle(particle);
+                particles.deactivate(particle);
+                continue;
+              }
+            }
+          }
+        } else {
+          particle.y += 1;
+        }
+```
+
+The _draw_ function is now separated into two parts. The first part called only once and it draws the floor and the background.
+```js
+    drawStage : function(ctx){
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+      ctx.strokeStyle = 'blue';
+      ctx.beginPath();
+      ctx.moveTo(0, floor.y + 2);
+      ctx.lineTo(ctx.canvas.width, floor.y + 2);
+      ctx.stroke();
+    }
+```
+
+The actual _draw_ function puts black pixels on all the deleted particles and then green pixels on all the set particles
+```js
+   draw: function (ctx) {
+      var i;
+      
+      for (i = particles.toDelete.length - 1; i >= 0; i--) {
+        putBlackPixel(ctx, particles.toDelete[i].x, particles.toDelete[i].y);
+      }
+
+      for (i = particles.toSet.length - 1; i >= 0; i--) {
+        putGreenPixel(ctx, particles.toSet[i].x, particles.toSet[i].y);
+      }
+
+      particles.reset();
+```
+
+I call _reset_ at the end to clear all the data collected for this frame.
+With these two improvements both the _update_ and the _draw_ functions handle
+roughly 300 particles per iteration. This number doesn't increase even when the
+total number of particles on the screen passes 10K. The final result is here [http://jsfiddle.net/zbzzn/AFCdy/7/]
+
+**Note: I am ignoring the memory consumption of my code for brevity of this text. I should be using object pools and other measures 
+to decrease the memory pressure and GC calls.**

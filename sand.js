@@ -1,12 +1,9 @@
 ﻿window.onload = function () {
   //Particles class
   var Particles = function () {
-
     this.size = 0;
 
     this.allParticles = {};
-    this.tempParticles = [];
-    this.isDirty = false;
 
     this.activeParticles = {};
     this.tempActiveParticles = [];
@@ -34,7 +31,6 @@
     this.activeParticles[id] = particle;
     this.toSet.push({ x: particle.x, y: particle.y });
     this.size += 1;
-    this.isDirty = true;
   }
 
   Particles.prototype.deleteParticle = function (x, y) {
@@ -46,14 +42,6 @@
     }
     this.toDelete.push({ x: particle.x, y: particle.y });
     this.size -= 1;
-    this.isDirty = true;
-  }
-
-  Particles.prototype.activate = function (particle) {
-    var id = Particles.encodeId(particle.x, particle.y);
-    if (!this.activeParticles[id]) {
-      this.activeParticles[id] = particle;
-    }
   }
 
   Particles.prototype.deactivate = function (particle) {
@@ -64,28 +52,9 @@
   }
 
 
-  Particles.prototype.getAllParticles = function () {
-    var particleId;
-    var count = 0;
-
-    if (!this.isDirty) {
-      return this.tempParticles;
-    }
-
-    for (particleId in this.allParticles) {
-      if (this.allParticles.hasOwnProperty(particleId) && this.allParticles[particleId] !== null) {
-        this.tempParticles[count] = this.allParticles[particleId];
-        count++;
-      }
-    }
-    this.tempParticles.length = count;
-    return this.tempParticles;
-  }
-
   Particles.prototype.getActiveParticles = function () {
     var particleId;
     var count = 0;
-
 
     for (particleId in this.activeParticles) {
       if (this.activeParticles.hasOwnProperty(particleId) && this.activeParticles[particleId] !== null) {
