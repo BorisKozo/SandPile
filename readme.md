@@ -91,7 +91,7 @@ the Chrome Dev Tools Frames profiler to visualize this issue.
 
 ![update-draw loop consuming more and more time](/images/1k.png "Chrome Dev Tools breakdown of the frames time consumption")
 
-** Basic changes
+## Basic changes
 
 I started by applying two basic changes. The first change was in the _update_ function. I noticed that there is a double for
 loop that iterated over the entire array of particles and checks the interaction between each two. Clearly the lookup of a
@@ -207,7 +207,7 @@ which is somewhat old and not true anymore. Changing the drawing method to a sim
 After these two improvements I could get 60 FPS with about 4.5K particles on the screen.
 You can see this here [http://jsfiddle.net/zbzzn/AFCdy/6/]
 
-** Partial update and rendering
+## Partial update and rendering
 
 Looking at the scope of the problem it is possible to divide the particles into two groups for both the _update_
 and the _draw_ functions. Thee first group consists of particles that move around and fall all over the place while the second group 
@@ -353,6 +353,8 @@ I call _reset_ at the end to clear all the data collected for this frame.
 With these two improvements both the _update_ and the _draw_ functions handle
 roughly 300 particles per iteration. This number doesn't increase even when the
 total number of particles on the screen passes 10K. The final result is here [http://jsfiddle.net/zbzzn/AFCdy/7/]
+
+<iframe width="100%" height="300" src="http://jsfiddle.net/zbzzn/AFCdy/7/embedded/" allowfullscreen="allowfullscreen" frameborder="0"></iframe>
 
 **Note: I am ignoring the memory consumption of my code for brevity of this text. I should be using object pools and other measures 
 to decrease the memory pressure and GC calls.**
